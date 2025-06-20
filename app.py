@@ -249,7 +249,7 @@ def upload_file(file_path, url, headers):
 
     payload = {
         "messages": [
-            {"role": "user", "content": "这是我的数据库内容，请你解释一下这些数据："+file_data}
+            {"role": "user", "content": "这是我的数据库内容，请你把其中的每一行解释为自然语言："+file_data}
         ],
         "max_tokens": 30000
     }
