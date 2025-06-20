@@ -8,7 +8,10 @@ from collections import deque
 import psutil  # 需要安装：pip install psutil
 import threading
 import requests  # 添加requests库用于API调用
+import duckdb
 
+url = "http://localhost:8080/v1/chat/completions"
+headers = {"Content-Type": "application/json"}
 
 app = Flask(__name__)
 
@@ -137,14 +140,15 @@ def generate_sensor_data():
 # 使用Llama Server生成SQL
 def generate_sql_from_query(query):
     # 调用本地部署的Llama Server
-    url = "http://localhost:8080/v1/chat/completions"
-    headers = {"Content-Type": "application/json"}
+    # url = "http://localhost:8080/v1/chat/completions"
+    # headers = {"Content-Type": "application/json"}
 
     # 创建提示词，明确要求只返回SQL语句
     prompt = (
         "你是一个SQL专家，根据用户的问题生成SQL查询语句。"
         "只返回SQL语句，不要包含任何其他解释或文本。"
-        "数据库表结构：stats(cpu,memory,disk,network)\n\n"
+        "数据库表名：device_metrics_random"
+        "数据库表结构：(timestamp(yyyy/mm/dd xx:xx:xx)、cpu_temp(float)、cpu_usage(float)、memory_usage(float)、disk_usage(float)、network_up(float)、network_down(float))\n\n"
         f"用户问题: {query}\n\nSQL:"
     )
 
@@ -191,76 +195,88 @@ def generate_sql_from_query(query):
         return "SELECT * FROM sensors LIMIT 10"
 
 # 将查询结果翻译为自然语言
-def translate_to_natural_language(results, user_query):
-    if not results:
-        return "没有找到匹配的记录。"
+# def translate_to_natural_language(results, user_query):
 
-    # 分析结果
-    normal_count = sum(1 for r in results if r['status'] == '正常')
-    warning_count = sum(1 for r in results if r['status'] == '警告')
-    danger_count = sum(1 for r in results if r['status'] == '危险')
-    device_counts = {}
+    # if not results:
+    #     return "没有找到匹配的记录。"
+    #
+    # # 分析结果
+    # normal_count = sum(1 for r in results if r['status'] == '正常')
+    # warning_count = sum(1 for r in results if r['status'] == '警告')
+    # danger_count = sum(1 for r in results if r['status'] == '危险')
+    # device_counts = {}
+    #
+    # for r in results:
+    #     device = r['device']
+    #     device_counts[device] = device_counts.get(device, 0) + 1
+    #
+    # # 根据查询类型生成不同的描述
+    # if '统计' in user_query or '数量' in user_query or '次数' in user_query:
+    #     return f"根据您的查询，共找到 {len(results)} 条记录。其中：\n" \
+    #            f"- 正常状态: {normal_count} 个\n" \
+    #            f"- 警告状态: {warning_count} 个\n" \
+    #            f"- 危险状态: {danger_count} 个"
+    #
+    # elif '导出' in user_query or '下载' in user_query:
+    #     return f"已成功导出 {len(results)} 条记录到 output.csv 文件。"
+    #
+    # else:
+    #     # 生成自然语言描述
+    #     response = f"为您找到 {len(results)} 条相关记录：\n\n"
+    #
+    #     for i, r in enumerate(results[:5]):  # 只显示前5条详细记录
+    #         time_str = r['timestamp'].split(' ')[1][:5]  # 只取时间部分
+    #         response += f"{i + 1}. {time_str} {r['device']} 的 {r['sensor']}传感器: {r['value']} ({r['status']}状态)\n"
+    #
+    #     if len(results) > 5:
+    #         response += f"\n...等 {len(results)} 条记录"
+    #
+    #     response += f"\n\n分析摘要：\n"
+    #     response += f"- 共有 {len(device_counts)} 台设备存在相关记录\n"
+    #
+    #     if danger_count > 0:
+    #         response += f"⚠️ 发现 {danger_count} 个危险状态，建议立即检查相关设备！"
+    #     elif warning_count > 0:
+    #         response += f"⚠️ 发现 {warning_count} 个警告状态，建议安排设备检查。"
+    #     else:
+    #         response += "所有设备状态正常，无异常情况。"
+    #
+    #     return response
 
-    for r in results:
-        device = r['device']
-        device_counts[device] = device_counts.get(device, 0) + 1
+def upload_file(file_path, url, headers):
+    with open(file_path, 'r', encoding='utf-8') as file:
+        file_data = file.read()
 
-    # 根据查询类型生成不同的描述
-    if '统计' in user_query or '数量' in user_query or '次数' in user_query:
-        return f"根据您的查询，共找到 {len(results)} 条记录。其中：\n" \
-               f"- 正常状态: {normal_count} 个\n" \
-               f"- 警告状态: {warning_count} 个\n" \
-               f"- 危险状态: {danger_count} 个"
+    payload = {
+        "messages": [
+            {"role": "user", "content": "这是我的数据库内容，请你解释一下这些数据："+file_data}
+        ],
+        "max_tokens": 30000
+    }
 
-    elif '导出' in user_query or '下载' in user_query:
-        return f"已成功导出 {len(results)} 条记录到 output.csv 文件。"
-
-    else:
-        # 生成自然语言描述
-        response = f"为您找到 {len(results)} 条相关记录：\n\n"
-
-        for i, r in enumerate(results[:5]):  # 只显示前5条详细记录
-            time_str = r['timestamp'].split(' ')[1][:5]  # 只取时间部分
-            response += f"{i + 1}. {time_str} {r['device']} 的 {r['sensor']}传感器: {r['value']} ({r['status']}状态)\n"
-
-        if len(results) > 5:
-            response += f"\n...等 {len(results)} 条记录"
-
-        response += f"\n\n分析摘要：\n"
-        response += f"- 共有 {len(device_counts)} 台设备存在相关记录\n"
-
-        if danger_count > 0:
-            response += f"⚠️ 发现 {danger_count} 个危险状态，建议立即检查相关设备！"
-        elif warning_count > 0:
-            response += f"⚠️ 发现 {warning_count} 个警告状态，建议安排设备检查。"
-        else:
-            response += "所有设备状态正常，无异常情况。"
-
-        return response
-
+    response = requests.post(url, json=payload, headers=headers)
+    return response.json()
 
 # 模拟DuckDB查询执行
 def execute_query(sql, user_query):
+    new_sql = re.sub(r"FROM\s+([^\s]+)", r'FROM "\1.csv"', sql)
     # 打印生成的SQL到终端
     print("\n" + "=" * 50)
     print("生成的SQL语句:")
-    print(sql)
+    print(new_sql)
     print("=" * 50 + "\n")
+    duckdb.read_csv('device_metrics_random.csv')
+    duckdb.query(new_sql).write_csv('out.csv')
 
-    # 模拟查询执行时间 (0.1-0.5秒)
-    time.sleep(random.uniform(0.1, 0.5))
-
-    # 生成结果数据
-    results = generate_sensor_data()
-
-    # 将结果翻译为自然语言
-    natural_language = translate_to_natural_language(results, user_query)
+    # 翻译成自然语言
+    file_path = 'out.csv'
+    response_data = upload_file(file_path, url, headers)
+    print(response_data)
 
     return {
         'sql': sql,
-        'results': results,
-        'natural_language': natural_language,
-        'result_count': len(results),
+        'natural_language': response_data,
+        'natural_language_count': len(response_data),
         'execution_time': round(random.uniform(0.15, 0.55), 3)
     }
 
