@@ -259,26 +259,49 @@ def upload_file(file_path, url, headers):
 
 # 模拟DuckDB查询执行
 def execute_query(sql, user_query):
-    new_sql = re.sub(r"FROM\s+([^\s]+)", r'FROM "\1.csv"', sql)
-    # 打印生成的SQL到终端
-    print("\n" + "=" * 50)
-    print("生成的SQL语句:")
-    print(new_sql)
-    print("=" * 50 + "\n")
-    duckdb.read_csv('device_metrics_random.csv')
-    duckdb.query(new_sql).write_csv('out.csv')
+    try:
+        new_sql = re.sub(r"FROM\s+([^\s]+)", r'FROM "\1.csv"', sql)
+        print("\n" + "=" * 50)
+        print("生成的SQL语句:")
+        print(new_sql)
+        print("=" * 50 + "\n")
 
-    # 翻译成自然语言
-    file_path = 'out.csv'
-    response_data = upload_file(file_path, url, headers)
-    print(response_data)
+        # 执行DuckDB查询
+        duckdb.read_csv('device_metrics_random.csv')
+        duckdb.query(new_sql).write_csv('out.csv')
 
-    return {
-        'sql': sql,
-        'natural_language': response_data,
-        'natural_language_count': len(response_data),
-        'execution_time': round(random.uniform(0.15, 0.55), 3)
-    }
+        # 读取生成的CSV文件内容
+        with open('out.csv', 'r') as f:
+            csv_content = f.read()
+
+        # 调用LLM API获取自然语言解释
+        response_data = upload_file('out.csv', url, headers)
+
+        # 确保response_data是字符串格式
+        if isinstance(response_data, dict):
+            natural_language = response_data.get('choices', [{}])[0].get('message', {}).get('content', '无法解析响应')
+        else:
+            natural_language = str(response_data)
+
+        # 统计结果数量
+        result_count = len(csv_content.splitlines()) - 1  # 减去表头行
+
+        return {
+            'sql': sql,
+            'natural_language': natural_language,
+            'result_count': result_count,
+            'execution_time': round(random.uniform(0.15, 0.55), 3),
+            'csv_content': csv_content  # 可选：如果需要在前端显示原始数据
+        }
+
+    except Exception as e:
+        print(f"查询执行出错: {str(e)}")
+        return {
+            'error': str(e),
+            'natural_language': f"查询执行出错: {str(e)}",
+            'result_count': 0,
+            'execution_time': 0
+        }
 
 
 # 获取历史记录

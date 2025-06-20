@@ -613,6 +613,8 @@
 
         // 执行查询
         function executeQuery() {
+            const queryInput = document.getElementById('queryInput').value;
+
             // 显示加载状态
             document.getElementById('naturalResult').innerHTML = `
                 <div class="d-flex flex-column align-items-center justify-content-center text-primary py-4">
@@ -620,52 +622,53 @@
                     <span>正在处理查询请求...</span>
                 </div>
             `;
-            string_query_text = document.getElementById("queryInput").value
-            // axios.post('/query', {
-            //     query: string_query_text,
-            // })
-            //     .then(function (response) {
-            //         console.log(response);
-            //     })
-            //     .catch(function (error) {
-            //         console.log(error);
-            //     })
-            //     .finally(function () {
-            //         // 总是会执行
-            //     });
-            formdata1 = new FormData();
-            formdata1.append("query",string_query_text)
-            fetch('/query',{
-                method: 'post',
-                body: formdata1,
+
+            // 发送请求到后端
+            fetch('/query', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `query=${encodeURIComponent(queryInput)}`
             })
+            .then(response => response.json())
+            .then(data => {
+                // 处理响应数据
+                if (data.error) {
+                    // 显示错误信息
+                    document.getElementById('naturalResult').innerHTML = `
+                        <div class="alert alert-danger">
+                            <h5>查询出错：</h5>
+                            <p>${data.error}</p>
+                        </div>
+                    `;
+                } else {
+                    // 显示自然语言结果
+                    document.getElementById('naturalResult').innerHTML = `
+                        <div class="alert alert-success">
+                            <h5>分析结果：</h5>
+                            <pre style="white-space: pre-wrap; background: #f8f9fa; padding: 10px; border-radius: 5px;">${data.natural_language}</pre>
+                        </div>
+                    `;
 
-            // 模拟API延迟（1秒后显示结果）
-            setTimeout(() => {
-                // 模拟数据示例
-                const mockData = {
-                    natural_result: "系统检测到以下设备状态：\n- 设备#1: 温度正常(25°C)\n- 设备#2: 高温警告(78°C)\n- 设备#3: 离线状态",
-                    result_count: 3,
-                    execution_time: "356"
-                };
+                    // 更新统计信息
+                    document.getElementById('resultCount').textContent = data.result_count + ' 条记录';
+                    document.getElementById('resultCount').className = 'badge bg-success';
+                    document.getElementById('executionTime').textContent = data.execution_time + 's';
 
-                // 更新自然语言结果
+                    // 如果需要显示原始数据表格（可选）
+                    // updateResultTable(data.csv_content);
+                }
+            })
+            .catch(error => {
+                console.error('查询请求失败:', error);
                 document.getElementById('naturalResult').innerHTML = `
-                    <div class="alert alert-success">
-                        <h5>查询结果：</h5>
-                        <p style="white-space: pre-line">${mockData.natural_result}</p>
+                    <div class="alert alert-danger">
+                        <h5>请求失败：</h5>
+                        <p>${error.message}</p>
                     </div>
                 `;
-
-                // 更新统计信息
-                document.getElementById('resultCount').textContent = mockData.result_count + ' 条记录';
-                document.getElementById('resultCount').className = 'badge bg-success';
-                document.getElementById('executionTime').textContent = mockData.execution_time + 'ms';
-
-                // 如果需要同时更新表格（根据您的代码片段）
-                updateResultTable(mockData.results || []);
-
-            }, 1000);
+            });
         }
 
         // 更新结果表格
