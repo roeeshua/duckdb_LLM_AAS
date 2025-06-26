@@ -183,16 +183,17 @@ def generate_sql_from_query(query):
         # 提取 SQL 语句
         pattern = r'```sql\n(.*?);\n```'
         match = re.search(pattern, sql_response, re.DOTALL)
-
         if match:
             sql_query = match.group(1).strip()
+        elif str(sql_response).startswith('SELECT'):
+            sql_query = str(sql_response).strip()
         else:
-            sql_query = "No SQL found."
+            sql_query = "SELECT * FROM device_metrics_random.csv LIMIT 10"
         return sql_query
     except Exception as e:
         print(f"调用Llama Server失败: {str(e)}")
         # 失败时返回默认SQL
-        return "SELECT * FROM sensors LIMIT 10"
+        return "SELECT * FROM device_metrics_random.csv LIMIT 10"
 
 # 将查询结果翻译为自然语言
 # def translate_to_natural_language(results, user_query):
@@ -257,7 +258,7 @@ def upload_file(file_path, url, headers):
     response = requests.post(url, json=payload, headers=headers)
     return response.json()
 
-# 模拟DuckDB查询执行
+# DuckDB查询执行
 def execute_query(sql, user_query):
     try:
         new_sql = re.sub(r"FROM\s+([^\s]+)", r'FROM "\1.csv"', sql)
@@ -291,7 +292,7 @@ def execute_query(sql, user_query):
             'natural_language': natural_language,
             'result_count': result_count,
             'execution_time': round(random.uniform(0.15, 0.55), 3),
-            'csv_content': csv_content  # 可选：如果需要在前端显示原始数据
+            # 'csv_content': csv_content  # 可选：如果需要在前端显示原始数据
         }
 
     except Exception as e:
@@ -421,13 +422,13 @@ def process_query():
     system_stats['disk'].append(random.randint(20, 60))
     system_stats['network'].append(random.randint(10, 50))
 
-    # 添加系统监控数据到结果
-    result['system_stats'] = {
-        'cpu': list(system_stats['cpu']),
-        'memory': list(system_stats['memory']),
-        'disk': list(system_stats['disk']),
-        'network': list(system_stats['network'])
-    }
+    # # 添加系统监控数据到结果
+    # result['system_stats'] = {
+    #     'cpu': list(system_stats['cpu']),
+    #     'memory': list(system_stats['memory']),
+    #     'disk': list(system_stats['disk']),
+    #     'network': list(system_stats['network'])
+    # }
 
     # 获取历史记录
     history = get_query_history()
