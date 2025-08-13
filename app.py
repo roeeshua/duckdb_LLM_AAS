@@ -5,11 +5,12 @@ import time
 import datetime
 import re
 from collections import deque
-import psutil  # 需要安装：pip install psutil
+import psutil
 import threading
 import requests  # 添加requests库用于API调用
 import duckdb
 
+# 调用本地部署的Llama Server
 url = "http://localhost:8080/v1/chat/completions"
 headers = {"Content-Type": "application/json"}
 
@@ -50,99 +51,8 @@ def generate_sensor_data():
 
     return data
 
-
-# # 模拟LLM生成SQL
-# def generate_sql_from_query(query):
-#     query = query.lower()
-#
-#     # 提取关键信息
-#     time_pattern = r'(\d+)\s*(分钟|小时|天)'
-#     sensor_pattern = r'(温度|振动|压力|电流|电压)'
-#     device_pattern = r'(\d+号设备|风机[A-D]|压缩机[C-F]|电机[D-G]|泵[E-H])'
-#
-#     # 时间条件
-#     time_match = re.search(time_pattern, query)
-#     time_condition = ""
-#     if time_match:
-#         value, unit = time_match.groups()
-#         if unit == '分钟':
-#             time_condition = f"time > NOW() - INTERVAL '{value} minutes'"
-#         elif unit == '小时':
-#             time_condition = f"time > NOW() - INTERVAL '{value} hours'"
-#         elif unit == '天':
-#             time_condition = f"time > NOW() - INTERVAL '{value} days'"
-#
-#     # 传感器类型条件
-#     sensor_match = re.search(sensor_pattern, query)
-#     sensor_condition = ""
-#     if sensor_match:
-#         sensor_type = sensor_match.group(1)
-#         sensor_condition = f"sensor_type = '{sensor_type}'"
-#
-#     # 设备条件
-#     device_match = re.search(device_pattern, query)
-#     device_condition = ""
-#     if device_match:
-#         device_id = device_match.group(1)
-#         device_condition = f"device_id = '{device_id}'"
-#
-#     # 阈值条件
-#     threshold_match = re.search(r'超过\s*(\d+)(度|℃|%)', query)
-#     threshold_condition = ""
-#     if threshold_match:
-#         threshold = threshold_match.group(1)
-#         threshold_condition = f"value > {threshold}"
-#
-#     # 状态条件
-#     status_condition = ""
-#     if '警告' in query:
-#         status_condition = "status = '警告'"
-#     elif '危险' in query:
-#         status_condition = "status = '危险'"
-#     elif '异常' in query:
-#         status_condition = "status != '正常'"
-#
-#     # 组合条件
-#     conditions = [c for c in [time_condition, sensor_condition, device_condition,
-#                               threshold_condition, status_condition] if c]
-#
-#     # 确定查询类型
-#     if '统计' in query or '数量' in query or '次数' in query:
-#         if conditions:
-#             where_clause = "WHERE " + " AND ".join(conditions)
-#         else:
-#             where_clause = ""
-#         return f"SELECT COUNT(*) FROM sensors {where_clause}"
-#
-#     elif '列表' in query or '显示' in query or '查看' in query:
-#         if conditions:
-#             where_clause = "WHERE " + " AND ".join(conditions)
-#         else:
-#             where_clause = ""
-#         return f"SELECT * FROM sensors {where_clause} ORDER BY time DESC LIMIT 10"
-#
-#     elif '导出' in query or '下载' in query:
-#         if conditions:
-#             where_clause = "WHERE " + " AND ".join(conditions)
-#         else:
-#             where_clause = ""
-#         return f"COPY (SELECT * FROM sensors {where_clause}) TO 'output.csv' (FORMAT CSV)"
-#
-#     else:
-#         # 默认查询
-#         if conditions:
-#             where_clause = "WHERE " + " AND ".join(conditions)
-#         else:
-#             where_clause = ""
-#         return f"SELECT * FROM sensors {where_clause} ORDER BY time DESC LIMIT 10"
-
-
 # 使用Llama Server生成SQL
 def generate_sql_from_query(query):
-    # 调用本地部署的Llama Server
-    # url = "http://localhost:8080/v1/chat/completions"
-    # headers = {"Content-Type": "application/json"}
-
     # 创建提示词，明确要求只返回SQL语句
     prompt = (
         "你是一个SQL专家，根据用户的问题生成SQL查询语句。"
@@ -170,16 +80,6 @@ def generate_sql_from_query(query):
             print(i)
         # 提取生成的SQL
         sql_response = temp[0]["message"]["content"]
-
-        #result = re.sub(r'<think>.*?</think>\s*', '', sql_response, flags=re.DOTALL)
-
-        # 清理响应，只保留SQL语句
-        # # 尝试提取代码块中的SQL
-        # if "```sql" in sql_response:
-        #     sql_response = sql_response.split("```sql")[1].split("```")[0].strip()
-        # # 尝试提取第一行SQL
-        # elif "SELECT" in sql_response:
-        #     sql_response = sql_response.split("\n")[0].strip()
         # 提取 SQL 语句
         pattern = r'```sql\n(.*?);\n```'
         match = re.search(pattern, sql_response, re.DOTALL)
@@ -194,55 +94,6 @@ def generate_sql_from_query(query):
         print(f"调用Llama Server失败: {str(e)}")
         # 失败时返回默认SQL
         return "SELECT * FROM device_metrics_random.csv LIMIT 10"
-
-# 将查询结果翻译为自然语言
-# def translate_to_natural_language(results, user_query):
-
-    # if not results:
-    #     return "没有找到匹配的记录。"
-    #
-    # # 分析结果
-    # normal_count = sum(1 for r in results if r['status'] == '正常')
-    # warning_count = sum(1 for r in results if r['status'] == '警告')
-    # danger_count = sum(1 for r in results if r['status'] == '危险')
-    # device_counts = {}
-    #
-    # for r in results:
-    #     device = r['device']
-    #     device_counts[device] = device_counts.get(device, 0) + 1
-    #
-    # # 根据查询类型生成不同的描述
-    # if '统计' in user_query or '数量' in user_query or '次数' in user_query:
-    #     return f"根据您的查询，共找到 {len(results)} 条记录。其中：\n" \
-    #            f"- 正常状态: {normal_count} 个\n" \
-    #            f"- 警告状态: {warning_count} 个\n" \
-    #            f"- 危险状态: {danger_count} 个"
-    #
-    # elif '导出' in user_query or '下载' in user_query:
-    #     return f"已成功导出 {len(results)} 条记录到 output.csv 文件。"
-    #
-    # else:
-    #     # 生成自然语言描述
-    #     response = f"为您找到 {len(results)} 条相关记录：\n\n"
-    #
-    #     for i, r in enumerate(results[:5]):  # 只显示前5条详细记录
-    #         time_str = r['timestamp'].split(' ')[1][:5]  # 只取时间部分
-    #         response += f"{i + 1}. {time_str} {r['device']} 的 {r['sensor']}传感器: {r['value']} ({r['status']}状态)\n"
-    #
-    #     if len(results) > 5:
-    #         response += f"\n...等 {len(results)} 条记录"
-    #
-    #     response += f"\n\n分析摘要：\n"
-    #     response += f"- 共有 {len(device_counts)} 台设备存在相关记录\n"
-    #
-    #     if danger_count > 0:
-    #         response += f"⚠️ 发现 {danger_count} 个危险状态，建议立即检查相关设备！"
-    #     elif warning_count > 0:
-    #         response += f"⚠️ 发现 {warning_count} 个警告状态，建议安排设备检查。"
-    #     else:
-    #         response += "所有设备状态正常，无异常情况。"
-    #
-    #     return response
 
 def upload_file(file_path, url, headers):
     with open(file_path, 'r', encoding='utf-8') as file:
@@ -421,14 +272,6 @@ def process_query():
     system_stats['memory'].append(random.randint(40, 85))
     system_stats['disk'].append(random.randint(20, 60))
     system_stats['network'].append(random.randint(10, 50))
-
-    # # 添加系统监控数据到结果
-    # result['system_stats'] = {
-    #     'cpu': list(system_stats['cpu']),
-    #     'memory': list(system_stats['memory']),
-    #     'disk': list(system_stats['disk']),
-    #     'network': list(system_stats['network'])
-    # }
 
     # 获取历史记录
     history = get_query_history()

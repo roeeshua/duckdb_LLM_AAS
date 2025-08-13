@@ -1,5 +1,5 @@
 由于上传文件大小限制，我们无法上传模型文件。
-请下载Qwen gguf模型或其他模型文件到本目录下 (/llama)，并将其重命名为qwen.gguf
+请下载Qwen gguf模型或其他模型文件到本目录下 (/model)，并将其重命名为qwen.gguf
 
 > [!Tip]
 > 在开发环境下，我们使用的是qwen2.5-1.5b-instruct-q4_k_m.gguf
