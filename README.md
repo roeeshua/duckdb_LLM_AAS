@@ -1,5 +1,5 @@
 # duckdb_LLM_AAS
-A DuckDB Embedded Database and LLM Intelligent Analysis System
+A DuckDB Unembedded Database and LLM Amazing Analysis System.
 
 LLM running supported by [*llama.cpp*](<https://github.com/ggml-org/llama.cpp>).
 
